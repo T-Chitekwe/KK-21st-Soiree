@@ -1,0 +1,58 @@
+<%- include('_head') %>
+
+<div class="stars-overlay"></div>
+
+<main class="page-center">
+  <div class="card card--rsvp" role="main">
+
+    <div class="card__ornament" aria-hidden="true"></div>
+
+    <p class="card__eyebrow">Reservation</p>
+    <h1 class="card__title">
+      K <span class="amp">&amp;</span> K
+    </h1>
+    <p class="card__subtitle">21st Soirée</p>
+
+    <div class="card__divider" aria-hidden="true">
+      <div class="card__divider-line"></div>
+      <div class="card__divider-diamond"></div>
+      <div class="card__divider-line"></div>
+    </div>
+
+    <p class="card__greeting">
+      Welcome, <strong><%= firstName %> <%= lastName %></strong>
+    </p>
+    <p class="card__intro">Will you be joining us for the celebration?</p>
+
+    <% if (error) { %>
+      <div class="alert alert--error" role="alert"><%= error %></div>
+    <% } %>
+
+    <form action="/rsvp" method="POST" class="form form--rsvp" novalidate>
+      <div class="rsvp-choices">
+
+        <button type="submit" name="status" value="attending" class="rsvp-choice rsvp-choice--yes">
+          <span class="rsvp-choice__icon" aria-hidden="true">✦</span>
+          <span class="rsvp-choice__label">Attending</span>
+          <span class="rsvp-choice__sub">Yes, I'll be there</span>
+        </button>
+
+        <button type="submit" name="status" value="not_attending" class="rsvp-choice rsvp-choice--no">
+          <span class="rsvp-choice__icon" aria-hidden="true">✦</span>
+          <span class="rsvp-choice__label">Not Attending</span>
+          <span class="rsvp-choice__sub">I won't make it</span>
+        </button>
+
+      </div>
+    </form>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
+</footer>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

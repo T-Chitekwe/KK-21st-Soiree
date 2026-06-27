@@ -1,0 +1,81 @@
+<%- include('_head') %>
+
+<div class="stars-overlay"></div>
+
+<main class="page-center">
+  <div class="card card--entry" role="main">
+
+    <div class="card__ornament" aria-hidden="true"></div>
+
+    <p class="card__eyebrow">You're Invited</p>
+    <h1 class="card__title">K <span class="amp">&amp;</span> K</h1>
+    <p class="card__subtitle">21st Soirée — Reservations</p>
+
+    <div class="card__divider" aria-hidden="true">
+      <div class="card__divider-line"></div>
+      <div class="card__divider-diamond"></div>
+      <div class="card__divider-line"></div>
+    </div>
+
+    <p class="card__intro">Please enter your details to proceed with your reservation.</p>
+
+    <% if (error) { %>
+      <div class="alert alert--error" role="alert"><%= error %></div>
+    <% } %>
+
+    <form action="/name" method="POST" class="form" novalidate>
+      <div class="form__group">
+        <label class="form__label" for="first_name">First Name</label>
+        <input
+          class="form__input"
+          type="text"
+          id="first_name"
+          name="first_name"
+          placeholder="Enter your first name"
+          value="<%= prefill ? prefill.first_name : '' %>"
+          autocomplete="given-name"
+          required
+          autofocus
+        />
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="last_name">Last Name</label>
+        <input
+          class="form__input"
+          type="text"
+          id="last_name"
+          name="last_name"
+          placeholder="Enter your last name"
+          value="<%= prefill ? prefill.last_name : '' %>"
+          autocomplete="family-name"
+          required
+        />
+      </div>
+      <div class="form__group">
+        <label class="form__label" for="whatsapp">WhatsApp Number</label>
+        <input
+          class="form__input"
+          type="tel"
+          id="whatsapp"
+          name="whatsapp"
+          placeholder="e.g. 0821234567"
+          value="<%= prefill ? prefill.whatsapp : '' %>"
+          autocomplete="tel"
+          required
+        />
+      </div>
+      <button type="submit" class="btn btn--gold btn--full">
+        Continue <span class="btn__arrow">→</span>
+      </button>
+    </form>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
+</footer>
+
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+<%- include('_head') %>
+
+<div class="stars-overlay"></div>
+
+<header class="dash-header">
+  <div class="dash-header__inner">
+    <div>
+      <p class="dash-header__eyebrow">Admin Dashboard</p>
+      <h1 class="dash-header__title">K <span class="amp">&amp;</span> K — RSVP Responses</h1>
+    </div>
+    <div class="dash-header__actions">
+      <a href="/admin/export" class="btn btn--outline btn--sm">Export CSV ↓</a>
+      <a href="/admin/logout" class="btn btn--ghost btn--sm">Sign Out</a>
+    </div>
+  </div>
+</header>
+
+<main class="dash-main">
+
+  <div class="dash-stats">
+    <div class="stat-card stat-card--total">
+      <span class="stat-card__num"><%= stats.total %></span>
+      <span class="stat-card__label">Total Responses</span>
+    </div>
+    <div class="stat-card stat-card--attending">
+      <span class="stat-card__num"><%= stats.attending %></span>
+      <span class="stat-card__label">Attending</span>
+    </div>
+    <div class="stat-card stat-card--absent">
+      <span class="stat-card__num"><%= stats.not_attending %></span>
+      <span class="stat-card__label">Not Attending</span>
+    </div>
+    <div class="stat-card stat-card--transport">
+      <span class="stat-card__num"><%= stats.needs_transport %></span>
+      <span class="stat-card__label">Need Transport</span>
+    </div>
+    <div class="stat-card stat-card--allergy">
+      <span class="stat-card__num"><%= stats.has_allergies %></span>
+      <span class="stat-card__label">Dietary Notes</span>
+    </div>
+  </div>
+
+  <div class="dash-controls">
+    <form action="/admin/dashboard" method="GET" class="dash-search">
+      <input class="form__input dash-search__input" type="search" name="search"
+             placeholder="Search name or number…" value="<%= search %>" />
+      <% if (filter !== 'all') { %>
+        <input type="hidden" name="filter" value="<%= filter %>" />
+      <% } %>
+      <button type="submit" class="btn btn--gold btn--sm">Search</button>
+      <% if (search) { %>
+        <a href="/admin/dashboard" class="btn btn--ghost btn--sm">Clear</a>
+      <% } %>
+    </form>
+    <div class="dash-filters">
+      <a href="/admin/dashboard?filter=all<%= search ? '&search='+search : '' %>"
+         class="filter-btn <%= filter==='all' ? 'filter-btn--active' : '' %>">All</a>
+      <a href="/admin/dashboard?filter=attending<%= search ? '&search='+search : '' %>"
+         class="filter-btn <%= filter==='attending' ? 'filter-btn--active' : '' %>">Attending</a>
+      <a href="/admin/dashboard?filter=not_attending<%= search ? '&search='+search : '' %>"
+         class="filter-btn <%= filter==='not_attending' ? 'filter-btn--active' : '' %>">Not Attending</a>
+      <a href="/admin/dashboard?filter=transport<%= search ? '&search='+search : '' %>"
+         class="filter-btn <%= filter==='transport' ? 'filter-btn--active' : '' %>">Needs Transport</a>
+      <a href="/admin/dashboard?filter=allergies<%= search ? '&search='+search : '' %>"
+         class="filter-btn <%= filter==='allergies' ? 'filter-btn--active' : '' %>">Dietary Notes</a>
+    </div>
+  </div>
+
+  <div class="dash-table-wrap">
+    <% if (rsvps.length === 0) { %>
+      <div class="dash-empty">
+        <p>No responses found<% if (search) { %> for "<%= search %>"<% } %>.</p>
+      </div>
+    <% } else { %>
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>First Name</th>
+            <th>Last Name</th>
+            <th>WhatsApp</th>
+            <th>Status</th>
+            <th>Transport</th>
+            <th>Dietary / Allergies</th>
+            <th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% rsvps.forEach((r, i) => { %>
+            <tr>
+              <td class="dash-table__num"><%= i + 1 %></td>
+              <td><%= r.first_name %></td>
+              <td><%= r.last_name %></td>
+              <td class="dash-table__phone"><%= r.whatsapp || '—' %></td>
+              <td>
+                <span class="badge badge--<%= r.status === 'attending' ? 'yes' : 'no' %>">
+                  <%= r.status === 'attending' ? 'Attending' : 'Not Attending' %>
+                </span>
+              </td>
+              <td>
+                <% if (r.transport === 'yes') { %>
+                  <span class="badge badge--transport">Yes</span>
+                <% } else if (r.transport === 'no') { %>
+                  <span class="dash-table__dim">No</span>
+                <% } else { %>
+                  <span class="dash-table__dim">—</span>
+                <% } %>
+              </td>
+              <td class="dash-table__allergy">
+                <% if (r.allergies && r.allergies !== 'none' && r.allergies !== '') { %>
+                  <span class="badge badge--allergy"><%= r.allergies %></span>
+                <% } else { %>
+                  <span class="dash-table__dim">None</span>
+                <% } %>
+              </td>
+              <td class="dash-table__date"><%= r.updated_at || r.created_at %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <p>K &amp; K Admin · Secure Dashboard</p>
+</footer>
+</body>
+</html>
