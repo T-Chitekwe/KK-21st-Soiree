@@ -859,3 +859,138 @@ a { color: inherit; text-decoration: none; }
 @media (max-width: 480px) {
   .popup { padding: 2rem 1.5rem; }
 }
+
+/* ── DELETE MODAL ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.88);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+.modal {
+  background: rgba(8,8,16,0.98);
+  border: 1px solid rgba(224,112,112,0.3);
+  box-shadow: 0 0 60px rgba(224,112,112,0.08);
+  padding: 2rem 2rem;
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  animation: popupIn 0.3s var(--ease) both;
+}
+.modal__title {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 300;
+  color: var(--white);
+  margin-bottom: 0.5rem;
+}
+.modal__desc {
+  font-size: 0.9rem;
+  color: var(--gold);
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+.modal__warn {
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  color: rgba(224,112,112,0.7);
+  text-transform: uppercase;
+  margin-bottom: 1.5rem;
+}
+.modal__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+/* ── DANGER BUTTON ── */
+.btn--danger {
+  background: rgba(224,112,112,0.15);
+  color: #e07070;
+  border: 1px solid rgba(224,112,112,0.3);
+}
+.btn--danger:hover {
+  background: rgba(224,112,112,0.25);
+  border-color: rgba(224,112,112,0.6);
+}
+
+/* ── Transport question sub-text ── */
+.card__question-sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.4);
+  margin-top: -1rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+/* ── ADMIN MANAGEMENT PAGE ── */
+.admin-mgmt {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.admin-mgmt__panel {
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  padding: 2rem;
+}
+.admin-mgmt__title {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  font-weight: 300;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.4rem;
+}
+.admin-mgmt__desc {
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.35);
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+.admin-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.admin-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(212,175,55,0.1);
+  background: rgba(212,175,55,0.03);
+}
+.admin-list__name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--white);
+  letter-spacing: 0.05em;
+}
+.admin-list__icon { color: var(--gold); font-size: 0.7rem; }
+.admin-list__you {
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  color: var(--gold);
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+.alert--success {
+  background: rgba(111,207,127,0.08);
+  border-left: 2px solid var(--green);
+  color: #9de0ac;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+@media (max-width: 768px) {
+  .admin-mgmt { grid-template-columns: 1fr; }
+}

@@ -162,9 +162,28 @@ async function createAdmin(username, hashedPassword) {
   save();
 }
 
+async function deleteRsvp(id) {
+  const d = await getDb();
+  d.run(`DELETE FROM rsvps WHERE id=?`, [id]);
+  save();
+}
+
 module.exports = {
   getDb, upsertRsvp,
   findByNameOnly, findByNameAndPhone,
   getAllRsvps, searchRsvps, getRsvpStats,
-  getAdmin, createAdmin
+  getAdmin, createAdmin, deleteRsvp, getAllAdmins, deleteAdmin
 };
+// This line intentionally left for append — deleteRsvp added below
+
+async function getAllAdmins() {
+  const d = await getDb();
+  const res = d.exec(`SELECT id, username FROM admins ORDER BY id ASC`);
+  return rowsToObjects(res);
+}
+
+async function deleteAdmin(id) {
+  const d = await getDb();
+  d.run(`DELETE FROM admins WHERE id=?`, [id]);
+  save();
+}

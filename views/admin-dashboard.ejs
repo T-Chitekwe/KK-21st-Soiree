@@ -9,7 +9,10 @@
       <h1 class="dash-header__title">K <span class="amp">&amp;</span> K — RSVP Responses</h1>
     </div>
     <div class="dash-header__actions">
-      <a href="/admin/export" class="btn btn--outline btn--sm">Export CSV ↓</a>
+      <a href="/admin/export?sheet=attending" class="btn btn--outline btn--sm">Export Attending ↓</a>
+      <a href="/admin/export?sheet=not_attending" class="btn btn--outline btn--sm">Export Not Attending ↓</a>
+      <a href="/admin/export" class="btn btn--outline btn--sm">Export All ↓</a>
+      <a href="/admin/admins" class="btn btn--outline btn--sm">Manage Admins</a>
       <a href="/admin/logout" class="btn btn--ghost btn--sm">Sign Out</a>
     </div>
   </div>
@@ -17,6 +20,7 @@
 
 <main class="dash-main">
 
+  <!-- Stats -->
   <div class="dash-stats">
     <div class="stat-card stat-card--total">
       <span class="stat-card__num"><%= stats.total %></span>
@@ -32,7 +36,7 @@
     </div>
     <div class="stat-card stat-card--transport">
       <span class="stat-card__num"><%= stats.needs_transport %></span>
-      <span class="stat-card__label">Need Transport</span>
+      <span class="stat-card__label">Need Transport Home</span>
     </div>
     <div class="stat-card stat-card--allergy">
       <span class="stat-card__num"><%= stats.has_allergies %></span>
@@ -40,6 +44,7 @@
     </div>
   </div>
 
+  <!-- Search & Filter -->
   <div class="dash-controls">
     <form action="/admin/dashboard" method="GET" class="dash-search">
       <input class="form__input dash-search__input" type="search" name="search"
@@ -66,6 +71,23 @@
     </div>
   </div>
 
+  <!-- Delete confirmation modal -->
+  <div class="modal-overlay" id="delete-modal" style="display:none;">
+    <div class="modal">
+      <p class="modal__title">Delete this record?</p>
+      <p class="modal__desc" id="modal-name"></p>
+      <p class="modal__warn">This cannot be undone.</p>
+      <div class="modal__actions">
+        <form method="POST" id="delete-form">
+          <input type="hidden" name="_method" value="DELETE" />
+          <button type="submit" class="btn btn--danger btn--sm">Yes, Delete</button>
+        </form>
+        <button onclick="closeModal()" class="btn btn--ghost btn--sm">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Table -->
   <div class="dash-table-wrap">
     <% if (rsvps.length === 0) { %>
       <div class="dash-empty">
@@ -80,9 +102,10 @@
             <th>Last Name</th>
             <th>WhatsApp</th>
             <th>Status</th>
-            <th>Transport</th>
+            <th>Transport Home</th>
             <th>Dietary / Allergies</th>
             <th>Submitted</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -113,7 +136,13 @@
                   <span class="dash-table__dim">None</span>
                 <% } %>
               </td>
-              <td class="dash-table__date"><%= r.updated_at || r.created_at %></td>
+              <td class="dash-table__date"><%= (r.updated_at || r.created_at || '').slice(0,16) %></td>
+              <td>
+                <button
+                  class="btn btn--danger btn--sm"
+                  onclick="confirmDelete(<%= r.id %>, '<%= r.first_name %> <%= r.last_name %>')"
+                >✕</button>
+              </td>
             </tr>
           <% }); %>
         </tbody>
@@ -126,5 +155,20 @@
 <footer class="site-footer">
   <p>K &amp; K Admin · Secure Dashboard</p>
 </footer>
+
+<script>
+function confirmDelete(id, name) {
+  document.getElementById('modal-name').textContent = name;
+  document.getElementById('delete-form').action = '/admin/delete/' + id;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('delete-modal').style.display = 'none';
+}
+// Close on overlay click
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+</script>
 </body>
 </html>
