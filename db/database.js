@@ -7,6 +7,8 @@ const DB_PATH =
     ? '/var/data/rsvp.db'
     : path.join(__dirname, 'rsvp.db');
 
+let db;
+
 async function getDb() {
   if (db) return db;
   const SQL = await initSqlJs();
@@ -17,7 +19,6 @@ async function getDb() {
   } else {
     db = new SQL.Database();
   }
-
   db.run(`
     CREATE TABLE IF NOT EXISTS rsvps (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
