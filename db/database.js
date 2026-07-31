@@ -2,8 +2,10 @@ const initSqlJs = require('sql.js');
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, 'rsvp.db');
-let db;
+const DB_PATH =
+  process.env.NODE_ENV === 'production'
+    ? '/var/data/rsvp.db'
+    : path.join(__dirname, 'rsvp.db');
 
 async function getDb() {
   if (db) return db;
