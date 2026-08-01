@@ -19,7 +19,7 @@ async function getDb() {
   } else {
     db = new SQL.Database();
   }
-
+}
 const { createClient } = require('@libsql/client');
 
 let client;
