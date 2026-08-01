@@ -1,3 +1,25 @@
+const initSqlJs = require('sql.js');
+const fs = require('fs');
+const path = require('path');
+
+const DB_PATH =
+  process.env.RENDER
+    ? '/var/data/rsvp.db'
+    : path.join(__dirname, 'rsvp.db');
+
+let db;
+
+async function getDb() {
+  if (db) return db;
+  const SQL = await initSqlJs();
+
+  if (fs.existsSync(DB_PATH)) {
+    const fileBuffer = fs.readFileSync(DB_PATH);
+    db = new SQL.Database(fileBuffer);
+  } else {
+    db = new SQL.Database();
+  }
+
 const { createClient } = require('@libsql/client');
 
 let client;
