@@ -1,88 +1,45 @@
 <%- include('_head') %>
-
 <div class="stars-overlay"></div>
-
 <header class="dash-header">
   <div class="dash-header__inner">
-    <div>
-      <p class="dash-header__eyebrow">Admin Dashboard</p>
-      <h1 class="dash-header__title">K <span class="amp">&amp;</span> K — Manage Admins</h1>
-    </div>
+    <div><p class="dash-header__eyebrow">Admin Dashboard</p><h1 class="dash-header__title">K <span class="amp">&amp;</span> K — Manage Admins</h1></div>
     <div class="dash-header__actions">
       <a href="/admin/dashboard" class="btn btn--outline btn--sm">← Back to Dashboard</a>
       <a href="/admin/logout" class="btn btn--ghost btn--sm">Sign Out</a>
     </div>
   </div>
 </header>
-
 <main class="dash-main">
-
   <div class="admin-mgmt">
-
-    <!-- Add new admin -->
     <div class="admin-mgmt__panel">
       <h2 class="admin-mgmt__title">Add New Admin</h2>
       <p class="admin-mgmt__desc">New admins will have full access to the RSVP dashboard.</p>
-
-      <% if (typeof success !== 'undefined' && success) { %>
-        <div class="alert alert--success"><%= success %></div>
-      <% } %>
-      <% if (typeof error !== 'undefined' && error) { %>
-        <div class="alert alert--error"><%= error %></div>
-      <% } %>
-
+      <% if (success) { %><div class="alert alert--success"><%= success %></div><% } %>
+      <% if (error) { %><div class="alert alert--error"><%= error %></div><% } %>
       <form action="/admin/admins/add" method="POST" class="form">
-        <div class="form__group">
-          <label class="form__label" for="new_username">Username</label>
-          <input class="form__input" type="text" id="new_username" name="username"
-                 placeholder="e.g. katlego" required autocomplete="off" />
-        </div>
-        <div class="form__group">
-          <label class="form__label" for="new_password">Password</label>
-          <input class="form__input" type="password" id="new_password" name="password"
-                 placeholder="Choose a strong password" required autocomplete="new-password" />
-        </div>
-        <div class="form__group">
-          <label class="form__label" for="confirm_password">Confirm Password</label>
-          <input class="form__input" type="password" id="confirm_password" name="confirm_password"
-                 placeholder="Repeat the password" required autocomplete="new-password" />
-        </div>
+        <div class="form__group"><label class="form__label" for="new_username">Username</label><input class="form__input" type="text" id="new_username" name="username" placeholder="e.g. katlego" required autocomplete="off" /></div>
+        <div class="form__group"><label class="form__label" for="new_password">Password</label><input class="form__input" type="password" id="new_password" name="password" placeholder="Choose a strong password" required autocomplete="new-password" /></div>
+        <div class="form__group"><label class="form__label" for="confirm_password">Confirm Password</label><input class="form__input" type="password" id="confirm_password" name="confirm_password" placeholder="Repeat the password" required autocomplete="new-password" /></div>
         <button type="submit" class="btn btn--gold btn--full">Add Admin</button>
       </form>
     </div>
-
-    <!-- Current admins list -->
     <div class="admin-mgmt__panel">
       <h2 class="admin-mgmt__title">Current Admins</h2>
       <p class="admin-mgmt__desc">You cannot delete the account you are currently logged in with.</p>
-
       <div class="admin-list">
         <% admins.forEach(a => { %>
-          <div class="admin-list__item">
-            <span class="admin-list__name">
-              <span class="admin-list__icon">✦</span>
-              <%= a.username %>
-              <% if (a.username === currentAdmin) { %>
-                <span class="admin-list__you">(you)</span>
-              <% } %>
-            </span>
-            <% if (a.username !== currentAdmin) { %>
-              <form action="/admin/admins/delete/<%= a.id %>" method="POST" style="display:inline;">
-                <button type="submit" class="btn btn--danger btn--sm"
-                        onclick="return confirm('Remove admin <%= a.username %>?')">Remove</button>
-              </form>
-            <% } %>
-          </div>
+        <div class="admin-list__item">
+          <span class="admin-list__name"><span class="admin-list__icon">✦</span> <%= a.username %><% if(a.username===currentAdmin){%><span class="admin-list__you">(you)</span><%}%></span>
+          <% if(a.username!==currentAdmin){%>
+          <form action="/admin/admins/delete/<%= a.id %>" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn--danger btn--sm" onclick="return confirm('Remove admin <%= a.username %>?')">Remove</button>
+          </form>
+          <%}%>
+        </div>
         <% }); %>
       </div>
     </div>
-
   </div>
-
 </main>
-
-<footer class="site-footer">
-  <p>K &amp; K Admin · Secure Dashboard</p>
-</footer>
-</body>
-</html>
+<footer class="site-footer"><p>K &amp; K Admin · Secure Dashboard</p></footer>
+</body></html>

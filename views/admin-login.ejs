@@ -1,45 +1,25 @@
 <%- include('_head') %>
-
 <div class="stars-overlay"></div>
-
 <main class="page-center">
   <div class="card card--admin-login" role="main">
-
     <div class="card__ornament" aria-hidden="true"></div>
-
     <p class="card__eyebrow">Admin Access</p>
     <h1 class="card__title" style="font-size:2rem;">K <span class="amp">&amp;</span> K</h1>
     <p class="card__subtitle">RSVP Dashboard</p>
-
-    <div class="card__divider" aria-hidden="true">
-      <div class="card__divider-line"></div>
-      <div class="card__divider-diamond"></div>
-      <div class="card__divider-line"></div>
-    </div>
-
-    <% if (error) { %>
-      <div class="alert alert--error" role="alert"><%= error %></div>
-    <% } %>
-
+    <div class="card__divider" aria-hidden="true"><div class="card__divider-line"></div><div class="card__divider-diamond"></div><div class="card__divider-line"></div></div>
+    <% if (error) { %><div class="alert alert--error" role="alert"><%= error %></div><% } %>
     <form action="/admin/login" method="POST" class="form" novalidate>
       <div class="form__group">
         <label class="form__label" for="username">Username</label>
-        <input class="form__input" type="text" id="username" name="username"
-               placeholder="Enter username" autocomplete="username" required autofocus />
+        <input class="form__input" type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" required autofocus />
       </div>
       <div class="form__group">
         <label class="form__label" for="password">Password</label>
-        <input class="form__input" type="password" id="password" name="password"
-               placeholder="Enter password" autocomplete="current-password" required />
+        <input class="form__input" type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required />
       </div>
       <button type="submit" class="btn btn--gold btn--full">Access Dashboard</button>
     </form>
-
   </div>
 </main>
-
-<footer class="site-footer">
-  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
-</footer>
-</body>
-</html>
+<footer class="site-footer"><p>Katlego &amp; Karabo · The Grand 21st Soirée</p></footer>
+</body></html>

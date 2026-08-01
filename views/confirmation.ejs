@@ -1,139 +1,57 @@
 <%- include('_head') %>
-
 <div class="stars-overlay"></div>
 
 <% if (status === 'attending') { %>
-
-  <!-- ═══ POPUP 1: Confirmation ═══ -->
-  <div class="popup-overlay active" id="popup-confirm" role="dialog" aria-modal="true" aria-labelledby="popup-confirm-title">
-    <div class="popup">
-      <div class="confirm-burst" aria-hidden="true">
-        <span>✦</span><span>✦</span><span>✦</span>
-        <span>✦</span><span>✦</span><span>✦</span>
-      </div>
-
-      <p class="popup__eyebrow">You're All Set</p>
-      <h2 class="popup__headline" id="popup-confirm-title">Excellent News!</h2>
-
-      <div class="popup__divider" aria-hidden="true">
-        <div class="popup__divider-line"></div>
-        <div class="popup__divider-diamond"></div>
-        <div class="popup__divider-line"></div>
-      </div>
-
-      <p class="popup__message">
-        We're absolutely delighted that <strong><%= firstName %></strong> will be joining us.<br>
-        We look forward to celebrating with you.
-      </p>
-
-      <% if (transport === 'yes') { %>
-        <p class="popup__detail popup__detail--transport">🚗 Transport requested — we'll be in touch.</p>
-      <% } %>
-      <% if (allergies && allergies !== 'none' && allergies !== '') { %>
-        <p class="popup__detail popup__detail--allergy">🌿 Dietary note recorded: <em><%= allergies %></em></p>
-      <% } %>
-
-      <button class="btn btn--gold popup__close-btn" onclick="showDressCode()" aria-label="Close and view dress code notice">
-        Continue ✦
-      </button>
-    </div>
+<div class="popup-overlay active" id="popup-confirm" role="dialog" aria-modal="true">
+  <div class="popup">
+    <div class="confirm-burst" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span><span>✦</span><span>✦</span><span>✦</span></div>
+    <p class="popup__eyebrow">You're All Set</p>
+    <h2 class="popup__headline">Excellent News!</h2>
+    <div class="popup__divider" aria-hidden="true"><div class="popup__divider-line"></div><div class="popup__divider-diamond"></div><div class="popup__divider-line"></div></div>
+    <p class="popup__message">We're absolutely delighted that <strong><%= firstName %></strong> will be joining us.<br>We look forward to celebrating with you.</p>
+    <% if (transport === 'yes') { %><p class="popup__detail popup__detail--transport">🚗 Transport to drop-off requested — we'll be in touch.</p><% } %>
+    <% if (allergies && allergies !== 'none' && allergies !== '') { %><p class="popup__detail popup__detail--allergy">🌿 Dietary note recorded: <em><%= allergies %></em></p><% } %>
+    <button class="btn btn--gold popup__close-btn" onclick="showDressCode()">Continue ✦</button>
   </div>
+</div>
 
-  <!-- ═══ POPUP 2: Urgent Dress Code Notice ═══ -->
-  <div class="popup-overlay" id="popup-dresscode" role="dialog" aria-modal="true" aria-labelledby="popup-dress-title">
-    <div class="popup popup--urgent">
-
-      <div class="popup__urgent-badge" aria-hidden="true">⚠ IMPORTANT NOTICE</div>
-
-      <div class="popup__divider" aria-hidden="true">
-        <div class="popup__divider-line"></div>
-        <div class="popup__divider-diamond"></div>
-        <div class="popup__divider-line"></div>
-      </div>
-
-      <h2 class="popup__headline popup__headline--urgent" id="popup-dress-title">Dress Code</h2>
-
-      <p class="popup__urgent-message">
-        It is of <strong>paramount importance</strong> that the dress code of this event is adhered to.
-      </p>
-      <p class="popup__urgent-emphasis">
-        PLEASE TAKE NOTE of the following dress code guideline.
-      </p>
-
-      <div class="popup__divider" aria-hidden="true">
-        <div class="popup__divider-line"></div>
-        <div class="popup__divider-diamond"></div>
-        <div class="popup__divider-line"></div>
-      </div>
-
-      <a
-        href="https://tinyurl.com/soiree-dresscode"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="btn btn--gold"
-        style="margin-bottom:1rem;"
-      >
-        View Dress Code ✦
-      </a>
-
-      <div class="confirm__restart" style="margin-top:1.25rem;">
-        <p class="confirm__restart-label">Made a mistake?</p>
-        <a href="/restart" class="btn btn--ghost btn--sm">Start Over</a>
-      </div>
-    </div>
+<div class="popup-overlay" id="popup-dresscode" role="dialog" aria-modal="true">
+  <div class="popup popup--urgent">
+    <div class="popup__urgent-badge">⚠ IMPORTANT NOTICE</div>
+    <div class="popup__divider" aria-hidden="true"><div class="popup__divider-line"></div><div class="popup__divider-diamond"></div><div class="popup__divider-line"></div></div>
+    <h2 class="popup__headline popup__headline--urgent">Dress Code</h2>
+    <p class="popup__urgent-message">It is of <strong>paramount importance</strong> that the dress code of this event is adhered to.</p>
+    <p class="popup__urgent-emphasis">PLEASE TAKE NOTE of the following dress code guideline.</p>
+    <div class="popup__divider" aria-hidden="true"><div class="popup__divider-line"></div><div class="popup__divider-diamond"></div><div class="popup__divider-line"></div></div>
+    <a href="https://tinyurl.com/soiree-dresscode" target="_blank" rel="noopener noreferrer" class="btn btn--gold" style="margin-bottom:1rem;">View Dress Code ✦</a>
+    <div class="confirm__restart"><p class="confirm__restart-label">Made a mistake?</p><a href="/restart" class="btn btn--ghost btn--sm">Start Over</a></div>
   </div>
+</div>
 
 <% } else { %>
-
-  <!-- ═══ NOT ATTENDING — single card, no popup needed ═══ -->
-  <main class="page-center">
-    <div class="card card--confirm card--not-attending" role="main">
-
-      <div class="confirm-icon" aria-hidden="true">◈</div>
-
-      <p class="card__eyebrow">Response Recorded</p>
-      <h2 class="confirm__headline">Thank You for Letting Us Know.</h2>
-
-      <div class="card__divider" aria-hidden="true">
-        <div class="card__divider-line"></div>
-        <div class="card__divider-diamond"></div>
-        <div class="card__divider-line"></div>
-      </div>
-
-      <p class="confirm__message">
-        We're sorry you won't be able to make it, <strong><%= firstName %></strong>.<br>
-        You will be <em>missed!</em>
-      </p>
-
-      <div class="confirm__restart">
-        <p class="confirm__restart-label">Made a mistake?</p>
-        <a href="/restart" class="btn btn--ghost btn--sm">Start Over</a>
-      </div>
-
-    </div>
-  </main>
-
+<main class="page-center">
+  <div class="card card--confirm card--not-attending" role="main">
+    <div class="confirm-icon" aria-hidden="true">◈</div>
+    <p class="card__eyebrow">Response Recorded</p>
+    <h2 class="confirm__headline">Thank You for Letting Us Know.</h2>
+    <div class="card__divider" aria-hidden="true"><div class="card__divider-line"></div><div class="card__divider-diamond"></div><div class="card__divider-line"></div></div>
+    <p class="confirm__message">We're sorry you won't be able to make it, <strong><%= firstName %></strong>.<br>You will be <em>missed!</em></p>
+    <div class="confirm__restart"><p class="confirm__restart-label">Made a mistake?</p><a href="/restart" class="btn btn--ghost btn--sm">Start Over</a></div>
+  </div>
+</main>
 <% } %>
 
-<footer class="site-footer">
-  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
-</footer>
-
+<footer class="site-footer"><p>Katlego &amp; Karabo · The Grand 21st Soirée</p></footer>
 <script src="/js/app.js"></script>
 <script>
-  function showDressCode() {
-    // Close popup 1
-    const p1 = document.getElementById('popup-confirm');
-    p1.classList.add('popup-overlay--closing');
-    setTimeout(() => {
-      p1.classList.remove('active');
-      p1.classList.remove('popup-overlay--closing');
-      // Open popup 2
-      const p2 = document.getElementById('popup-dresscode');
-      p2.classList.add('active');
-      p2.querySelector('.btn--gold').focus();
-    }, 380);
-  }
+function showDressCode() {
+  const p1 = document.getElementById('popup-confirm');
+  p1.classList.add('popup-overlay--closing');
+  setTimeout(() => {
+    p1.classList.remove('active'); p1.classList.remove('popup-overlay--closing');
+    const p2 = document.getElementById('popup-dresscode');
+    p2.classList.add('active');
+  }, 380);
+}
 </script>
-</body>
-</html>
+</body></html>

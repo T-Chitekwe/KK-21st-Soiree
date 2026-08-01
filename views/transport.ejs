@@ -1,46 +1,24 @@
 <%- include('_head') %>
-
 <div class="stars-overlay"></div>
-
 <main class="page-center">
   <div class="card card--question" role="main">
-
     <div class="card__ornament" aria-hidden="true"></div>
-
     <p class="card__eyebrow">Just a Few Questions</p>
     <h1 class="card__title">K <span class="amp">&amp;</span> K</h1>
     <p class="card__subtitle">21st Soirée</p>
-
-    <div class="card__divider" aria-hidden="true">
-      <div class="card__divider-line"></div>
-      <div class="card__divider-diamond"></div>
-      <div class="card__divider-line"></div>
-    </div>
-
+    <div class="card__divider" aria-hidden="true"><div class="card__divider-line"></div><div class="card__divider-diamond"></div><div class="card__divider-line"></div></div>
     <p class="card__step">Step 2 of 2</p>
     <p class="card__question">Will you require transport <em>after</em> the event?</p>
     <p class="card__question-sub">Transport will be provided from the venue to a designated drop-off point at the end of the evening.</p>
-
     <form action="/transport" method="POST" class="rsvp-choices" style="margin-top:1.5rem;">
       <button type="submit" name="transport" value="yes" class="rsvp-choice rsvp-choice--yes">
-        <span class="rsvp-choice__icon" aria-hidden="true">✦</span>
-        <span class="rsvp-choice__label">Yes</span>
-        <span class="rsvp-choice__sub">I need transport to the designated drop-off</span>
+        <span class="rsvp-choice__icon">✦</span><span class="rsvp-choice__label">Yes</span><span class="rsvp-choice__sub">I need transport to the designated drop-off</span>
       </button>
       <button type="submit" name="transport" value="no" class="rsvp-choice rsvp-choice--no">
-        <span class="rsvp-choice__icon" aria-hidden="true">◈</span>
-        <span class="rsvp-choice__label">No</span>
-        <span class="rsvp-choice__sub">I have my own way home</span>
+        <span class="rsvp-choice__icon">◈</span><span class="rsvp-choice__label">No</span><span class="rsvp-choice__sub">I have my own way home</span>
       </button>
     </form>
-
   </div>
 </main>
-
-<footer class="site-footer">
-  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
-</footer>
-
-<script src="/js/app.js"></script>
-</body>
-</html>
+<footer class="site-footer"><p>Katlego &amp; Karabo · The Grand 21st Soirée</p></footer>
+<script src="/js/app.js"></script></body></html>

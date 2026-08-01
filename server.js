@@ -20,28 +20,27 @@ app.use(session({
   cookie: { maxAge: 1000 * 60 * 60 * 4 }
 }));
 
-// ── Keep-alive ping to prevent Render free tier sleep ──
+// Keep-alive ping
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
 if (RENDER_URL) {
   setInterval(() => {
-    http.get(RENDER_URL, (res) => {
-      console.log(`Keep-alive ping: ${res.statusCode}`);
-    }).on('error', (e) => {
-      console.log(`Keep-alive error: ${e.message}`);
-    });
-  }, 10 * 60 * 1000); // every 10 minutes
+    http.get(RENDER_URL, () => {}).on('error', () => {});
+  }, 10 * 60 * 1000);
 }
 
-// Seed admin on startup
+// Seed admin
 (async () => {
-  const adminUser = process.env.ADMIN_USER || 'admin';
-  const adminPass = process.env.ADMIN_PASS || 'soiree2025';
-  const existing  = await db.getAdmin(adminUser);
-  if (!existing) {
-    const hash = await bcrypt.hash(adminPass, 12);
-    await db.createAdmin(adminUser, hash);
-    console.log(`Admin seeded — username: ${adminUser}`);
-  }
+  try {
+    await db.getDb();
+    const adminUser = process.env.ADMIN_USER || 'admin';
+    const adminPass = process.env.ADMIN_PASS || 'soiree2025';
+    const existing  = await db.getAdmin(adminUser);
+    if (!existing) {
+      const hash = await bcrypt.hash(adminPass, 12);
+      await db.createAdmin(adminUser, hash);
+      console.log('Admin seeded: ' + adminUser);
+    }
+  } catch(e) { console.error('Seed error:', e.message); }
 })();
 
 function requireAdmin(req, res, next) {
@@ -49,44 +48,25 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-// ═══════════════════════════════════
-//  USER ROUTES
-// ═══════════════════════════════════
-
-app.get('/', (req, res) => {
-  res.render('index', { error: null, prefill: null });
-});
+// USER ROUTES
+app.get('/', (req, res) => res.render('index', { error: null, prefill: null }));
 
 app.post('/name', async (req, res) => {
   const firstName = (req.body.first_name || '').trim();
   const lastName  = (req.body.last_name  || '').trim();
   const whatsapp  = (req.body.whatsapp   || '').trim();
-
   if (!firstName || !lastName || !whatsapp) {
-    return res.render('index', {
-      error: 'Please fill in all three fields.',
-      prefill: { first_name: firstName, last_name: lastName, whatsapp }
-    });
+    return res.render('index', { error: 'Please fill in all three fields.', prefill: { first_name: firstName, last_name: lastName, whatsapp } });
   }
   if (!/^\+?[\d\s\-()]{7,20}$/.test(whatsapp)) {
-    return res.render('index', {
-      error: 'Please enter a valid WhatsApp number.',
-      prefill: { first_name: firstName, last_name: lastName, whatsapp }
-    });
+    return res.render('index', { error: 'Please enter a valid WhatsApp number.', prefill: { first_name: firstName, last_name: lastName, whatsapp } });
   }
-
-  req.session.firstName  = firstName;
-  req.session.lastName   = lastName;
-  req.session.whatsapp   = whatsapp;
-  req.session.rsvpStatus = null;
-  req.session.allergies  = null;
-  req.session.transport  = null;
-  req.session.rsvpDone   = false;
-
+  req.session.firstName = firstName; req.session.lastName = lastName;
+  req.session.whatsapp  = whatsapp;  req.session.rsvpStatus = null;
+  req.session.allergies = null;      req.session.transport  = null;
+  req.session.rsvpDone  = false;
   const exactMatch = await db.findByNameAndPhone(firstName, lastName, whatsapp);
-  if (exactMatch) {
-    return res.render('overwrite', { firstName, lastName });
-  }
+  if (exactMatch) return res.render('overwrite', { firstName, lastName });
   res.redirect('/rsvp');
 });
 
@@ -103,16 +83,13 @@ app.get('/rsvp', (req, res) => {
 app.post('/rsvp', (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
   const status = req.body.status;
-  if (!['attending', 'not_attending'].includes(status)) {
+  if (!['attending','not_attending'].includes(status)) {
     return res.render('rsvp', { firstName: req.session.firstName, lastName: req.session.lastName, error: 'Please select an option.' });
   }
   req.session.rsvpStatus = status;
-  if (status === 'attending') {
-    res.redirect('/allergies');
-  } else {
-    db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'not_attending', null, null)
-      .then(() => { req.session.rsvpDone = true; res.redirect('/confirmation'); });
-  }
+  if (status === 'attending') return res.redirect('/allergies');
+  db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'not_attending', null, null)
+    .then(() => { req.session.rsvpDone = true; res.redirect('/confirmation'); });
 });
 
 app.get('/allergies', (req, res) => {
@@ -122,14 +99,11 @@ app.get('/allergies', (req, res) => {
 
 app.post('/allergies', (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
-  const hasAllergies = req.body.has_allergies;
-  if (hasAllergies === 'yes') {
+  if (req.body.has_allergies === 'yes') {
     const detail = (req.body.allergy_detail || '').trim();
     if (!detail) return res.render('allergies', { error: 'Please describe your allergies, or choose "No allergies".' });
     req.session.allergies = detail;
-  } else {
-    req.session.allergies = 'none';
-  }
+  } else { req.session.allergies = 'none'; }
   res.redirect('/transport');
 });
 
@@ -141,7 +115,7 @@ app.get('/transport', (req, res) => {
 app.post('/transport', async (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
   const transport = req.body.transport;
-  if (!['yes', 'no'].includes(transport)) return res.redirect('/transport');
+  if (!['yes','no'].includes(transport)) return res.redirect('/transport');
   req.session.transport = transport;
   await db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'attending', req.session.allergies, transport);
   req.session.rsvpDone = true;
@@ -150,22 +124,12 @@ app.post('/transport', async (req, res) => {
 
 app.get('/confirmation', (req, res) => {
   if (!req.session.firstName || !req.session.rsvpStatus) return res.redirect('/');
-  res.render('confirmation', {
-    firstName: req.session.firstName,
-    status:    req.session.rsvpStatus,
-    allergies: req.session.allergies,
-    transport: req.session.transport
-  });
+  res.render('confirmation', { firstName: req.session.firstName, status: req.session.rsvpStatus, allergies: req.session.allergies, transport: req.session.transport });
 });
 
-app.get('/restart', (req, res) => {
-  req.session.destroy(() => res.redirect('/'));
-});
+app.get('/restart', (req, res) => req.session.destroy(() => res.redirect('/')));
 
-// ═══════════════════════════════════
-//  ADMIN ROUTES
-// ═══════════════════════════════════
-
+// ADMIN ROUTES
 app.get('/admin/login', (req, res) => {
   if (req.session.adminLoggedIn) return res.redirect('/admin/dashboard');
   res.render('admin-login', { error: null });
@@ -177,117 +141,222 @@ app.post('/admin/login', async (req, res) => {
   if (!admin) return res.render('admin-login', { error: 'Invalid credentials.' });
   const match = await bcrypt.compare(password, admin.password);
   if (!match) return res.render('admin-login', { error: 'Invalid credentials.' });
-  req.session.adminLoggedIn = true;
-  req.session.adminUser     = username;
+  req.session.adminLoggedIn = true; req.session.adminUser = username;
   res.redirect('/admin/dashboard');
 });
 
-app.get('/admin/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/admin/login');
-});
+app.get('/admin/logout', (req, res) => req.session.destroy(() => res.redirect('/admin/login')));
 
 app.get('/admin/dashboard', requireAdmin, async (req, res) => {
   const search = req.query.search || '';
   const filter = req.query.filter || 'all';
   let rsvps = search ? await db.searchRsvps(search) : await db.getAllRsvps();
   const stats = await db.getRsvpStats();
-
   if (filter === 'attending')          rsvps = rsvps.filter(r => r.status === 'attending');
   else if (filter === 'not_attending') rsvps = rsvps.filter(r => r.status === 'not_attending');
   else if (filter === 'transport')     rsvps = rsvps.filter(r => r.transport === 'yes');
   else if (filter === 'allergies')     rsvps = rsvps.filter(r => r.allergies && r.allergies !== 'none' && r.allergies !== '');
-
   res.render('admin-dashboard', { rsvps, stats, search, filter, adminUser: req.session.adminUser });
 });
 
-// Delete a single RSVP record
 app.post('/admin/delete/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
   if (!isNaN(id)) await db.deleteRsvp(id);
-  // Redirect back with same filter/search
-  const ref = req.get('Referrer') || '/admin/dashboard';
-  res.redirect(ref);
+  res.redirect(req.get('Referrer') || '/admin/dashboard');
 });
 
-// CSV export — sheet param controls which group
 app.get('/admin/export', requireAdmin, async (req, res) => {
-  const sheet = req.query.sheet || 'all'; // 'attending' | 'not_attending' | 'all'
-  let allRsvps = await db.getAllRsvps();
-
+  const ExcelJS = require('exceljs');
+  const sheet   = req.query.sheet || 'all';
+  let allRsvps  = await db.getAllRsvps();
   let rows, filename, title;
 
   if (sheet === 'attending') {
-    rows     = allRsvps.filter(r => r.status === 'attending');
-    filename = 'kk-attending.csv';
-    title    = 'ATTENDING GUESTS';
+    rows = allRsvps.filter(r => r.status === 'attending');
+    filename = 'kk-attending.xlsx'; title = 'ATTENDING GUESTS';
   } else if (sheet === 'not_attending') {
-    rows     = allRsvps.filter(r => r.status === 'not_attending');
-    filename = 'kk-not-attending.csv';
-    title    = 'NOT ATTENDING';
+    rows = allRsvps.filter(r => r.status === 'not_attending');
+    filename = 'kk-not-attending.xlsx'; title = 'NOT ATTENDING';
   } else {
-    rows     = allRsvps;
-    filename = 'kk-all-rsvp.csv';
-    title    = 'ALL RESPONSES';
+    rows = allRsvps;
+    filename = 'kk-all-rsvp.xlsx'; title = 'ALL RESPONSES';
   }
 
-  const lines = [];
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'K & K RSVP System';
+  wb.created = new Date();
 
-  // Title block
-  lines.push(`K & K - 21st Soiree RSVP Data`);
-  lines.push(`${title}`);
-  lines.push(`Exported: ${new Date().toLocaleString('en-ZA')}`);
-  lines.push(`Total records: ${rows.length}`);
-  lines.push(``); // blank line
+  const ws = wb.addWorksheet(title, { views: [{ state: 'frozen', ySplit: 5 }] });
 
-  // Headers
-  if (sheet === 'attending' || sheet === 'all') {
-    lines.push(`#,First Name,Last Name,WhatsApp,Status,Transport Home,Dietary / Allergies,Submitted`);
+  // ── Colour palette ──
+  const BLACK  = '00000000';
+  const GOLD   = '00D4AF37';
+  const WHITE  = '00FFFFFF';
+  const LGOLD  = '00F5ECC8'; // light gold for alt rows
+  const DKGOLD = '00A8891F';
+  const GREEN  = '006FCF7F';
+  const RED    = '00E07070';
+  const BLUE   = '007EB8D4';
+  const PURPLE = '00C8AEF0';
+
+  // ── Title block (rows 1–4) ──
+  ws.mergeCells('A1:H1');
+  const titleCell = ws.getCell('A1');
+  titleCell.value = 'K & K — 21st Soirée RSVP Data';
+  titleCell.font  = { name: 'Georgia', size: 16, bold: true, color: { argb: GOLD } };
+  titleCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLACK } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(1).height = 36;
+
+  ws.mergeCells('A2:H2');
+  const subCell = ws.getCell('A2');
+  subCell.value = title;
+  subCell.font  = { name: 'Calibri', size: 12, bold: true, color: { argb: WHITE } };
+  subCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: DKGOLD } };
+  subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(2).height = 24;
+
+  ws.mergeCells('A3:H3');
+  const metaCell = ws.getCell('A3');
+  metaCell.value = `Exported: ${new Date().toLocaleString('en-ZA')}   |   Total records: ${rows.length}`;
+  metaCell.font  = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF888888' } };
+  metaCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00F5F5F5' } };
+  metaCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  ws.getRow(3).height = 20;
+
+  // blank spacer row
+  ws.getRow(4).height = 6;
+
+  // ── Column definitions ──
+  const isNotAttending = sheet === 'not_attending';
+  if (isNotAttending) {
+    ws.columns = [
+      { key: 'num',        width: 5  },
+      { key: 'first_name', width: 18 },
+      { key: 'last_name',  width: 18 },
+      { key: 'whatsapp',   width: 18 },
+      { key: 'status',     width: 16 },
+      { key: 'submitted',  width: 22 },
+    ];
   } else {
-    lines.push(`#,First Name,Last Name,WhatsApp,Status,Submitted`);
+    ws.columns = [
+      { key: 'num',        width: 5  },
+      { key: 'first_name', width: 18 },
+      { key: 'last_name',  width: 18 },
+      { key: 'whatsapp',   width: 18 },
+      { key: 'status',     width: 16 },
+      { key: 'transport',  width: 28 },
+      { key: 'allergies',  width: 28 },
+      { key: 'submitted',  width: 22 },
+    ];
   }
 
-  // Data rows
-  rows.forEach((r, i) => {
-    const date = (r.updated_at || r.created_at || '').slice(0, 16);
-    if (sheet === 'not_attending') {
-      lines.push(`${i+1},"${r.first_name}","${r.last_name}","${r.whatsapp || ''}","Not Attending","${date}"`);
-    } else {
-      const transport = r.transport === 'yes' ? 'Yes - needs lift home' : r.transport === 'no' ? 'No - own transport' : '—';
-      const allergies = (r.allergies && r.allergies !== 'none') ? r.allergies : 'None';
-      lines.push(`${i+1},"${r.first_name}","${r.last_name}","${r.whatsapp || ''}","${r.status === 'attending' ? 'Attending' : 'Not Attending'}","${transport}","${allergies}","${date}"`);
-    }
+  // ── Header row (row 5) ──
+  const headerLabels = isNotAttending
+    ? ['#', 'First Name', 'Last Name', 'WhatsApp', 'Status', 'Submitted']
+    : ['#', 'First Name', 'Last Name', 'WhatsApp', 'Status', 'Transport Home', 'Dietary / Allergies', 'Submitted'];
+
+  const headerRow = ws.getRow(5);
+  headerRow.height = 28;
+  headerLabels.forEach((label, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = label;
+    cell.font  = { name: 'Calibri', size: 11, bold: true, color: { argb: WHITE } };
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLACK } };
+    cell.alignment = { horizontal: i === 0 ? 'center' : 'left', vertical: 'middle' };
+    cell.border = {
+      bottom: { style: 'medium', color: { argb: GOLD } },
+      right:  { style: 'thin',   color: { argb: '00333333' } }
+    };
   });
 
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  // ── Data rows (from row 6) ──
+  rows.forEach((r, i) => {
+    const isEven  = i % 2 === 0;
+    const rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? WHITE : LGOLD } };
+    const rowNum  = i + 6;
+    const dataRow = ws.getRow(rowNum);
+    dataRow.height = 22;
+
+    const transport = r.transport === 'yes' ? 'Yes — needs transport to drop-off'
+                    : r.transport === 'no'  ? 'No — own transport' : '—';
+    const allergies = (r.allergies && r.allergies !== 'none' && r.allergies !== '')
+                    ? r.allergies : 'None';
+    const submitted = (r.updated_at || r.created_at || '').slice(0, 16).replace('T', ' ');
+    const statusLabel = r.status === 'attending' ? 'Attending' : 'Not Attending';
+
+    const values = isNotAttending
+      ? [i + 1, r.first_name, r.last_name, r.whatsapp || '', statusLabel, submitted]
+      : [i + 1, r.first_name, r.last_name, r.whatsapp || '', statusLabel, transport, allergies, submitted];
+
+    values.forEach((val, ci) => {
+      const cell = dataRow.getCell(ci + 1);
+      cell.value = val;
+      cell.fill  = rowFill;
+      cell.alignment = { horizontal: ci === 0 ? 'center' : 'left', vertical: 'middle', wrapText: true };
+      cell.font  = { name: 'Calibri', size: 10, color: { argb: '00222222' } };
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } },
+        right:  { style: 'thin', color: { argb: 'FFDDDDDD' } }
+      };
+
+      // Colour-coded status cell
+      if (ci === 4) {
+        cell.font = { name: 'Calibri', size: 10, bold: true,
+          color: { argb: r.status === 'attending' ? '00276227' : '00882222' } };
+        cell.fill = { type: 'pattern', pattern: 'solid',
+          fgColor: { argb: r.status === 'attending' ? '00D4EDDA' : '00F8D7DA' } };
+      }
+      // Colour-coded transport
+      if (!isNotAttending && ci === 5 && r.transport === 'yes') {
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: '00155D7A' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00D1ECF1' } };
+      }
+      // Colour-coded allergies
+      if (!isNotAttending && ci === 6 && allergies !== 'None') {
+        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: '006A3FA0' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00EDE0F5' } };
+      }
+    });
+  });
+
+  // ── Summary row at bottom ──
+  const summaryRowNum = rows.length + 6;
+  const summaryRow = ws.getRow(summaryRowNum);
+  summaryRow.height = 22;
+  const summaryCell = summaryRow.getCell(1);
+  ws.mergeCells(`A${summaryRowNum}:${isNotAttending ? 'F' : 'H'}${summaryRowNum}`);
+  summaryCell.value = `Total: ${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+  summaryCell.font  = { name: 'Calibri', size: 10, bold: true, color: { argb: WHITE } };
+  summaryCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: DKGOLD } };
+  summaryCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+  // ── Auto-filter on header row ──
+  const lastCol = isNotAttending ? 'F' : 'H';
+  ws.autoFilter = `A5:${lastCol}5`;
+
+  // ── Stream to response ──
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  // BOM for Excel to read correctly
-  res.send('\uFEFF' + lines.join('\r\n'));
+  await wb.xlsx.write(res);
+  res.end();
 });
 
-// ── Admin Management ──
+// Admin management
 app.get('/admin/admins', requireAdmin, async (req, res) => {
   const admins = await db.getAllAdmins();
-  res.render('admin-admins', {
-    admins,
-    currentAdmin: req.session.adminUser,
-    success: req.query.success || null,
-    error:   req.query.error   || null
-  });
+  res.render('admin-admins', { admins, currentAdmin: req.session.adminUser, success: req.query.success || null, error: req.query.error || null });
 });
 
 app.post('/admin/admins/add', requireAdmin, async (req, res) => {
-  const username  = (req.body.username         || '').trim().toLowerCase();
-  const password  = (req.body.password         || '').trim();
-  const confirm   = (req.body.confirm_password || '').trim();
-
+  const username = (req.body.username || '').trim().toLowerCase();
+  const password = (req.body.password || '').trim();
+  const confirm  = (req.body.confirm_password || '').trim();
   if (!username || !password) return res.redirect('/admin/admins?error=Please fill in all fields.');
   if (password !== confirm)   return res.redirect('/admin/admins?error=Passwords do not match.');
   if (password.length < 6)    return res.redirect('/admin/admins?error=Password must be at least 6 characters.');
-
   const existing = await db.getAdmin(username);
   if (existing) return res.redirect('/admin/admins?error=That username already exists.');
-
   const hash = await bcrypt.hash(password, 12);
   await db.createAdmin(username, hash);
   res.redirect('/admin/admins?success=Admin ' + username + ' added successfully.');
@@ -295,13 +364,10 @@ app.post('/admin/admins/add', requireAdmin, async (req, res) => {
 
 app.post('/admin/admins/delete/:id', requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
-  // Prevent deleting yourself
-  const all    = await db.getAllAdmins();
+  const all = await db.getAllAdmins();
   const target = all.find(a => a.id === id);
-  if (target && target.username !== req.session.adminUser) {
-    await db.deleteAdmin(id);
-  }
+  if (target && target.username !== req.session.adminUser) await db.deleteAdmin(id);
   res.redirect('/admin/admins');
 });
 
-app.listen(PORT, () => console.log(`K&K RSVP running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`K&K RSVP running on port ${PORT}`));

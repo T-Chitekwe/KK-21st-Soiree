@@ -1,44 +1,22 @@
 <%- include('_head') %>
-
 <div class="stars-overlay"></div>
-
 <main class="page-center">
   <div class="card card--overwrite" role="main">
-
     <div class="card__ornament" aria-hidden="true"></div>
-
     <p class="card__eyebrow">Record Found</p>
     <h1 class="card__title" style="font-size:2.2rem;">K <span class="amp">&amp;</span> K</h1>
     <p class="card__subtitle">21st Soirée — Reservations</p>
-
-    <div class="card__divider" aria-hidden="true">
-      <div class="card__divider-line"></div>
-      <div class="card__divider-diamond"></div>
-      <div class="card__divider-line"></div>
-    </div>
-
+    <div class="card__divider" aria-hidden="true"><div class="card__divider-line"></div><div class="card__divider-diamond"></div><div class="card__divider-line"></div></div>
     <div class="overwrite-info">
       <p class="overwrite-info__name"><%= firstName %> <%= lastName %></p>
       <p class="overwrite-info__detail">A reservation already exists for this name and number.</p>
     </div>
-
     <p class="overwrite-question">Would you like to update your existing response?</p>
-
     <div class="overwrite-actions">
-      <!-- Yes — proceed and overwrite -->
-      <form action="/name/overwrite" method="POST">
-        <button type="submit" class="btn btn--gold btn--full">Yes, Update My Response</button>
-      </form>
-
-      <!-- No — go back and re-enter details -->
+      <form action="/name/overwrite" method="POST"><button type="submit" class="btn btn--gold btn--full">Yes, Update My Response</button></form>
       <a href="/" class="btn btn--ghost btn--full">No, Go Back</a>
     </div>
-
   </div>
 </main>
-
-<footer class="site-footer">
-  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
-</footer>
-</body>
-</html>
+<footer class="site-footer"><p>Katlego &amp; Karabo · The Grand 21st Soirée</p></footer>
+</body></html>
