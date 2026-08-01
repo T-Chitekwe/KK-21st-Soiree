@@ -1,11 +1,12 @@
 const initSqlJs = require('sql.js');
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
 
-const DB_PATH =
-  process.env.RENDER
-    ? '/var/data/rsvp.db'
-    : path.join(__dirname, 'rsvp.db');
+// Render persistent disk mounts at /var/data
+// Locally falls back to the db/ folder
+const DB_PATH = process.env.RENDER
+  ? '/var/data/rsvp.db'
+  : path.join(__dirname, 'rsvp.db');
 
 let db;
 
@@ -19,27 +20,9 @@ async function getDb() {
   } else {
     db = new SQL.Database();
   }
-}
-const { createClient } = require('@libsql/client');
 
-let client;
-
-function getClient() {
-  if (client) return client;
-  if (!process.env.TURSO_URL) {
-    client = createClient({ url: 'file:rsvp.db' });
-  } else {
-    client = createClient({
-      url:       process.env.TURSO_URL,
-      authToken: process.env.TURSO_TOKEN
-    });
-  }
-  return client;
-}
-
-async function getDb() {
-  const c = getClient();
-  await c.execute(`
+  // Create tables
+  db.run(`
     CREATE TABLE IF NOT EXISTS rsvps (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       first_name   TEXT NOT NULL,
@@ -52,69 +35,97 @@ async function getDb() {
       updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
-  await c.execute(`
+
+  // Migrate existing DBs that may be missing columns
+  try { db.run(`ALTER TABLE rsvps ADD COLUMN whatsapp   TEXT`); } catch(e) {}
+  try { db.run(`ALTER TABLE rsvps ADD COLUMN allergies  TEXT`); } catch(e) {}
+  try { db.run(`ALTER TABLE rsvps ADD COLUMN transport  TEXT`); } catch(e) {}
+  try { db.run(`ALTER TABLE rsvps ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))`); } catch(e) {}
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS admins (
       id       INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL
     )
   `);
-  return c;
+
+  save();
+  return db;
 }
 
-async function findByNameOnly(firstName, lastName) {
-  const c = await getDb();
-  const res = await c.execute({
-    sql:  `SELECT * FROM rsvps WHERE LOWER(first_name)=LOWER(?) AND LOWER(last_name)=LOWER(?) LIMIT 1`,
-    args: [firstName, lastName]
+function save() {
+  if (!db) return;
+  const data = db.export();
+  // Make sure the directory exists before writing
+  const dir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(DB_PATH, Buffer.from(data));
+}
+
+function rowsToObjects(result) {
+  if (!result.length) return [];
+  const { columns, values } = result[0];
+  return values.map(row => {
+    const obj = {};
+    columns.forEach((col, i) => { obj[col] = row[i]; });
+    return obj;
   });
-  return res.rows[0] || null;
+}
+
+function escape(s) { return String(s).replace(/'/g, "''"); }
+
+async function findByNameOnly(firstName, lastName) {
+  const d = await getDb();
+  const res = d.exec(
+    `SELECT * FROM rsvps WHERE LOWER(first_name)=LOWER('${escape(firstName)}') AND LOWER(last_name)=LOWER('${escape(lastName)}') LIMIT 1`
+  );
+  return rowsToObjects(res)[0] || null;
 }
 
 async function findByNameAndPhone(firstName, lastName, whatsapp) {
-  const c = await getDb();
-  const res = await c.execute({
-    sql:  `SELECT * FROM rsvps WHERE LOWER(first_name)=LOWER(?) AND LOWER(last_name)=LOWER(?) AND whatsapp=? LIMIT 1`,
-    args: [firstName, lastName, whatsapp]
-  });
-  return res.rows[0] || null;
+  const d = await getDb();
+  const res = d.exec(
+    `SELECT * FROM rsvps WHERE LOWER(first_name)=LOWER('${escape(firstName)}') AND LOWER(last_name)=LOWER('${escape(lastName)}') AND whatsapp='${escape(whatsapp)}' LIMIT 1`
+  );
+  return rowsToObjects(res)[0] || null;
 }
 
 async function upsertRsvp(firstName, lastName, whatsapp, status, allergies, transport) {
-  const c = await getDb();
+  const d = await getDb();
   const existing = await findByNameOnly(firstName, lastName);
   if (existing) {
-    await c.execute({
-      sql:  `UPDATE rsvps SET whatsapp=?, status=?, allergies=?, transport=?, updated_at=datetime('now') WHERE LOWER(first_name)=LOWER(?) AND LOWER(last_name)=LOWER(?)`,
-      args: [whatsapp, status, allergies || null, transport || null, firstName, lastName]
-    });
+    d.run(
+      `UPDATE rsvps SET whatsapp=?, status=?, allergies=?, transport=?, updated_at=datetime('now') WHERE LOWER(first_name)=LOWER(?) AND LOWER(last_name)=LOWER(?)`,
+      [whatsapp, status, allergies || null, transport || null, firstName, lastName]
+    );
   } else {
-    await c.execute({
-      sql:  `INSERT INTO rsvps (first_name, last_name, whatsapp, status, allergies, transport) VALUES (?,?,?,?,?,?)`,
-      args: [firstName, lastName, whatsapp, status, allergies || null, transport || null]
-    });
+    d.run(
+      `INSERT INTO rsvps (first_name, last_name, whatsapp, status, allergies, transport) VALUES (?,?,?,?,?,?)`,
+      [firstName, lastName, whatsapp, status, allergies || null, transport || null]
+    );
   }
+  save();
 }
 
 async function getAllRsvps() {
-  const c = await getDb();
-  const res = await c.execute(`SELECT * FROM rsvps ORDER BY updated_at DESC`);
-  return res.rows;
+  const d = await getDb();
+  const res = d.exec('SELECT * FROM rsvps ORDER BY updated_at DESC');
+  return rowsToObjects(res);
 }
 
 async function searchRsvps(query) {
-  const c = await getDb();
-  const q = `%${query}%`;
-  const res = await c.execute({
-    sql:  `SELECT * FROM rsvps WHERE first_name LIKE ? OR last_name LIKE ? OR whatsapp LIKE ? ORDER BY updated_at DESC`,
-    args: [q, q, q]
-  });
-  return res.rows;
+  const d = await getDb();
+  const q = escape(query);
+  const res = d.exec(
+    `SELECT * FROM rsvps WHERE first_name LIKE '%${q}%' OR last_name LIKE '%${q}%' OR whatsapp LIKE '%${q}%' ORDER BY updated_at DESC`
+  );
+  return rowsToObjects(res);
 }
 
 async function getRsvpStats() {
-  const c = await getDb();
-  const res = await c.execute(`
+  const d = await getDb();
+  const res = d.exec(`
     SELECT
       COUNT(*) as total,
       SUM(CASE WHEN status='attending'     THEN 1 ELSE 0 END) as attending,
@@ -123,41 +134,39 @@ async function getRsvpStats() {
       SUM(CASE WHEN allergies IS NOT NULL AND allergies != '' AND allergies != 'none' THEN 1 ELSE 0 END) as has_allergies
     FROM rsvps
   `);
-  const row = res.rows[0];
-  return {
-    total:           Number(row.total)           || 0,
-    attending:       Number(row.attending)       || 0,
-    not_attending:   Number(row.not_attending)   || 0,
-    needs_transport: Number(row.needs_transport) || 0,
-    has_allergies:   Number(row.has_allergies)   || 0
-  };
+  if (!res.length) return { total: 0, attending: 0, not_attending: 0, needs_transport: 0, has_allergies: 0 };
+  const row = res[0].values[0];
+  return { total: row[0], attending: row[1], not_attending: row[2], needs_transport: row[3], has_allergies: row[4] };
 }
 
 async function deleteRsvp(id) {
-  const c = await getDb();
-  await c.execute({ sql: `DELETE FROM rsvps WHERE id=?`, args: [id] });
+  const d = await getDb();
+  d.run(`DELETE FROM rsvps WHERE id=?`, [id]);
+  save();
 }
 
 async function getAdmin(username) {
-  const c = await getDb();
-  const res = await c.execute({ sql: `SELECT * FROM admins WHERE username=? LIMIT 1`, args: [username] });
-  return res.rows[0] || null;
+  const d = await getDb();
+  const res = d.exec(`SELECT * FROM admins WHERE username='${escape(username)}' LIMIT 1`);
+  return rowsToObjects(res)[0] || null;
 }
 
 async function createAdmin(username, hashedPassword) {
-  const c = await getDb();
-  await c.execute({ sql: `INSERT OR IGNORE INTO admins (username, password) VALUES (?,?)`, args: [username, hashedPassword] });
+  const d = await getDb();
+  d.run('INSERT OR IGNORE INTO admins (username, password) VALUES (?, ?)', [username, hashedPassword]);
+  save();
 }
 
 async function getAllAdmins() {
-  const c = await getDb();
-  const res = await c.execute(`SELECT id, username FROM admins ORDER BY id ASC`);
-  return res.rows;
+  const d = await getDb();
+  const res = d.exec(`SELECT id, username FROM admins ORDER BY id ASC`);
+  return rowsToObjects(res);
 }
 
 async function deleteAdmin(id) {
-  const c = await getDb();
-  await c.execute({ sql: `DELETE FROM admins WHERE id=?`, args: [id] });
+  const d = await getDb();
+  d.run(`DELETE FROM admins WHERE id=?`, [id]);
+  save();
 }
 
 module.exports = {
