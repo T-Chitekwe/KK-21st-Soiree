@@ -255,6 +255,9 @@ app.get('/admin/export', requireAdmin, async (req, res) => {
   } else if (sheet === 'not_attending') {
     rows = allRsvps.filter(r => r.status === 'not_attending');
     filename = 'kk-not-attending.xlsx'; title = 'NOT ATTENDING';
+  } else if (sheet === 'transport') {
+    rows = allRsvps.filter(r => r.transport === 'yes');
+    filename = 'kk-transport.xlsx'; title = 'GUESTS NEEDING TRANSPORT';
   } else {
     rows = allRsvps;
     filename = 'kk-all-rsvp.xlsx'; title = 'ALL RESPONSES';
