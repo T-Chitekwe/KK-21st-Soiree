@@ -8,6 +8,10 @@ const db      = require('./db/database');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// ── Set this to true to close RSVPs ──
+// You can also set RSVP_CLOSED=true as a Render environment variable
+const RSVP_CLOSED = process.env.RSVP_CLOSED === 'true' || false;
+
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.use(express.urlencoded({ extended: true }));
@@ -28,7 +32,7 @@ if (RENDER_URL) {
   }, 10 * 60 * 1000);
 }
 
-// Seed admin
+// Seed admin on startup
 (async () => {
   try {
     await db.getDb();
@@ -48,50 +52,100 @@ function requireAdmin(req, res, next) {
   res.redirect('/admin/login');
 }
 
-// USER ROUTES
-app.get('/', (req, res) => res.render('index', { error: null, prefill: null }));
+// ═══════════════════════════════════
+//  USER ROUTES
+// ═══════════════════════════════════
+
+// Step 1 — Name entry
+app.get('/', (req, res) => {
+  res.render('index', { error: null, prefill: null });
+});
 
 app.post('/name', async (req, res) => {
   const firstName = (req.body.first_name || '').trim();
   const lastName  = (req.body.last_name  || '').trim();
   const whatsapp  = (req.body.whatsapp   || '').trim();
+
   if (!firstName || !lastName || !whatsapp) {
-    return res.render('index', { error: 'Please fill in all three fields.', prefill: { first_name: firstName, last_name: lastName, whatsapp } });
+    return res.render('index', {
+      error: 'Please fill in all three fields.',
+      prefill: { first_name: firstName, last_name: lastName, whatsapp }
+    });
   }
   if (!/^\+?[\d\s\-()]{7,20}$/.test(whatsapp)) {
-    return res.render('index', { error: 'Please enter a valid WhatsApp number.', prefill: { first_name: firstName, last_name: lastName, whatsapp } });
+    return res.render('index', {
+      error: 'Please enter a valid WhatsApp number.',
+      prefill: { first_name: firstName, last_name: lastName, whatsapp }
+    });
   }
-  req.session.firstName = firstName; req.session.lastName = lastName;
-  req.session.whatsapp  = whatsapp;  req.session.rsvpStatus = null;
-  req.session.allergies = null;      req.session.transport  = null;
-  req.session.rsvpDone  = false;
+
+  // Check if this person already exists in the database (by name only)
+  const existingByName = await db.findByNameOnly(firstName, lastName);
+
+  // ── DEADLINE CHECK ──
+  // If RSVPs are closed AND this is a brand new person → block them
+  // and silently record them as not_attending so admin can see
+  if (RSVP_CLOSED && !existingByName) {
+    // Record them as not attending so they appear in admin
+    await db.upsertRsvp(firstName, lastName, whatsapp, 'not_attending', null, null);
+    return res.render('deadline', { firstName, lastName });
+  }
+
+  // Store in session
+  req.session.firstName  = firstName;
+  req.session.lastName   = lastName;
+  req.session.whatsapp   = whatsapp;
+  req.session.rsvpStatus = null;
+  req.session.allergies  = null;
+  req.session.transport  = null;
+  req.session.rsvpDone   = false;
+
+  // Check if ALL 3 fields match exactly — show overwrite prompt
   const exactMatch = await db.findByNameAndPhone(firstName, lastName, whatsapp);
-  if (exactMatch) return res.render('overwrite', { firstName, lastName });
+  if (exactMatch) {
+    return res.render('overwrite', { firstName, lastName });
+  }
+
+  // Existing name, different number — or brand new (deadline open) — proceed
   res.redirect('/rsvp');
 });
 
+// Overwrite confirmation
 app.post('/name/overwrite', (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
   res.redirect('/rsvp');
 });
 
+// Step 2 — RSVP choice
 app.get('/rsvp', (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
-  res.render('rsvp', { firstName: req.session.firstName, lastName: req.session.lastName, error: null });
+  res.render('rsvp', {
+    firstName: req.session.firstName,
+    lastName:  req.session.lastName,
+    error: null
+  });
 });
 
 app.post('/rsvp', (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
   const status = req.body.status;
-  if (!['attending','not_attending'].includes(status)) {
-    return res.render('rsvp', { firstName: req.session.firstName, lastName: req.session.lastName, error: 'Please select an option.' });
+  if (!['attending', 'not_attending'].includes(status)) {
+    return res.render('rsvp', {
+      firstName: req.session.firstName,
+      lastName:  req.session.lastName,
+      error: 'Please select an option.'
+    });
   }
   req.session.rsvpStatus = status;
-  if (status === 'attending') return res.redirect('/allergies');
-  db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'not_attending', null, null)
-    .then(() => { req.session.rsvpDone = true; res.redirect('/confirmation'); });
+  if (status === 'attending') {
+    res.redirect('/allergies');
+  } else {
+    db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'not_attending', null, null)
+      .then(() => { req.session.rsvpDone = true; res.redirect('/confirmation'); });
+  }
 });
 
+// Step 3 — Allergies
 app.get('/allergies', (req, res) => {
   if (!req.session.firstName || req.session.rsvpStatus !== 'attending') return res.redirect('/');
   res.render('allergies', { error: null });
@@ -103,10 +157,13 @@ app.post('/allergies', (req, res) => {
     const detail = (req.body.allergy_detail || '').trim();
     if (!detail) return res.render('allergies', { error: 'Please describe your allergies, or choose "No allergies".' });
     req.session.allergies = detail;
-  } else { req.session.allergies = 'none'; }
+  } else {
+    req.session.allergies = 'none';
+  }
   res.redirect('/transport');
 });
 
+// Step 4 — Transport
 app.get('/transport', (req, res) => {
   if (!req.session.firstName || req.session.rsvpStatus !== 'attending') return res.redirect('/');
   res.render('transport', { error: null });
@@ -115,21 +172,34 @@ app.get('/transport', (req, res) => {
 app.post('/transport', async (req, res) => {
   if (!req.session.firstName) return res.redirect('/');
   const transport = req.body.transport;
-  if (!['yes','no'].includes(transport)) return res.redirect('/transport');
+  if (!['yes', 'no'].includes(transport)) return res.redirect('/transport');
   req.session.transport = transport;
-  await db.upsertRsvp(req.session.firstName, req.session.lastName, req.session.whatsapp, 'attending', req.session.allergies, transport);
+  await db.upsertRsvp(
+    req.session.firstName, req.session.lastName, req.session.whatsapp,
+    'attending', req.session.allergies, transport
+  );
   req.session.rsvpDone = true;
   res.redirect('/confirmation');
 });
 
+// Step 5 — Confirmation
 app.get('/confirmation', (req, res) => {
   if (!req.session.firstName || !req.session.rsvpStatus) return res.redirect('/');
-  res.render('confirmation', { firstName: req.session.firstName, status: req.session.rsvpStatus, allergies: req.session.allergies, transport: req.session.transport });
+  res.render('confirmation', {
+    firstName: req.session.firstName,
+    status:    req.session.rsvpStatus,
+    allergies: req.session.allergies,
+    transport: req.session.transport
+  });
 });
 
+// Restart
 app.get('/restart', (req, res) => req.session.destroy(() => res.redirect('/')));
 
-// ADMIN ROUTES
+// ═══════════════════════════════════
+//  ADMIN ROUTES
+// ═══════════════════════════════════
+
 app.get('/admin/login', (req, res) => {
   if (req.session.adminLoggedIn) return res.redirect('/admin/dashboard');
   res.render('admin-login', { error: null });
@@ -141,7 +211,8 @@ app.post('/admin/login', async (req, res) => {
   if (!admin) return res.render('admin-login', { error: 'Invalid credentials.' });
   const match = await bcrypt.compare(password, admin.password);
   if (!match) return res.render('admin-login', { error: 'Invalid credentials.' });
-  req.session.adminLoggedIn = true; req.session.adminUser = username;
+  req.session.adminLoggedIn = true;
+  req.session.adminUser     = username;
   res.redirect('/admin/dashboard');
 });
 
@@ -152,11 +223,17 @@ app.get('/admin/dashboard', requireAdmin, async (req, res) => {
   const filter = req.query.filter || 'all';
   let rsvps = search ? await db.searchRsvps(search) : await db.getAllRsvps();
   const stats = await db.getRsvpStats();
+
   if (filter === 'attending')          rsvps = rsvps.filter(r => r.status === 'attending');
   else if (filter === 'not_attending') rsvps = rsvps.filter(r => r.status === 'not_attending');
   else if (filter === 'transport')     rsvps = rsvps.filter(r => r.transport === 'yes');
   else if (filter === 'allergies')     rsvps = rsvps.filter(r => r.allergies && r.allergies !== 'none' && r.allergies !== '');
-  res.render('admin-dashboard', { rsvps, stats, search, filter, adminUser: req.session.adminUser });
+
+  res.render('admin-dashboard', {
+    rsvps, stats, search, filter,
+    adminUser:   req.session.adminUser,
+    rsvpClosed:  RSVP_CLOSED
+  });
 });
 
 app.post('/admin/delete/:id', requireAdmin, async (req, res) => {
@@ -165,6 +242,7 @@ app.post('/admin/delete/:id', requireAdmin, async (req, res) => {
   res.redirect(req.get('Referrer') || '/admin/dashboard');
 });
 
+// Excel export
 app.get('/admin/export', requireAdmin, async (req, res) => {
   const ExcelJS = require('exceljs');
   const sheet   = req.query.sheet || 'all';
@@ -188,73 +266,42 @@ app.get('/admin/export', requireAdmin, async (req, res) => {
 
   const ws = wb.addWorksheet(title, { views: [{ state: 'frozen', ySplit: 5 }] });
 
-  // ── Colour palette ──
-  const BLACK  = '00000000';
-  const GOLD   = '00D4AF37';
-  const WHITE  = '00FFFFFF';
-  const LGOLD  = '00F5ECC8'; // light gold for alt rows
-  const DKGOLD = '00A8891F';
-  const GREEN  = '006FCF7F';
-  const RED    = '00E07070';
-  const BLUE   = '007EB8D4';
-  const PURPLE = '00C8AEF0';
+  const BLACK  = '00000000'; const GOLD   = '00D4AF37'; const WHITE  = '00FFFFFF';
+  const LGOLD  = '00F5ECC8'; const DKGOLD = '00A8891F';
 
-  // ── Title block (rows 1–4) ──
   ws.mergeCells('A1:H1');
-  const titleCell = ws.getCell('A1');
-  titleCell.value = 'K & K — 21st Soirée RSVP Data';
-  titleCell.font  = { name: 'Georgia', size: 16, bold: true, color: { argb: GOLD } };
-  titleCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLACK } };
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  const t = ws.getCell('A1');
+  t.value = 'K & K — 21st Soirée RSVP Data';
+  t.font  = { name: 'Georgia', size: 16, bold: true, color: { argb: GOLD } };
+  t.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLACK } };
+  t.alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(1).height = 36;
 
   ws.mergeCells('A2:H2');
-  const subCell = ws.getCell('A2');
-  subCell.value = title;
-  subCell.font  = { name: 'Calibri', size: 12, bold: true, color: { argb: WHITE } };
-  subCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: DKGOLD } };
-  subCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  const s = ws.getCell('A2');
+  s.value = title;
+  s.font  = { name: 'Calibri', size: 12, bold: true, color: { argb: WHITE } };
+  s.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: DKGOLD } };
+  s.alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(2).height = 24;
 
   ws.mergeCells('A3:H3');
-  const metaCell = ws.getCell('A3');
-  metaCell.value = `Exported: ${new Date().toLocaleString('en-ZA')}   |   Total records: ${rows.length}`;
-  metaCell.font  = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF888888' } };
-  metaCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00F5F5F5' } };
-  metaCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  const m = ws.getCell('A3');
+  m.value = `Exported: ${new Date().toLocaleString('en-ZA')}   |   Total records: ${rows.length}`;
+  m.font  = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF888888' } };
+  m.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00F5F5F5' } };
+  m.alignment = { horizontal: 'center', vertical: 'middle' };
   ws.getRow(3).height = 20;
-
-  // blank spacer row
   ws.getRow(4).height = 6;
 
-  // ── Column definitions ──
   const isNotAttending = sheet === 'not_attending';
-  if (isNotAttending) {
-    ws.columns = [
-      { key: 'num',        width: 5  },
-      { key: 'first_name', width: 18 },
-      { key: 'last_name',  width: 18 },
-      { key: 'whatsapp',   width: 18 },
-      { key: 'status',     width: 16 },
-      { key: 'submitted',  width: 22 },
-    ];
-  } else {
-    ws.columns = [
-      { key: 'num',        width: 5  },
-      { key: 'first_name', width: 18 },
-      { key: 'last_name',  width: 18 },
-      { key: 'whatsapp',   width: 18 },
-      { key: 'status',     width: 16 },
-      { key: 'transport',  width: 28 },
-      { key: 'allergies',  width: 28 },
-      { key: 'submitted',  width: 22 },
-    ];
-  }
+  ws.columns = isNotAttending
+    ? [{ key:'num',width:5},{key:'first_name',width:18},{key:'last_name',width:18},{key:'whatsapp',width:18},{key:'status',width:16},{key:'submitted',width:22}]
+    : [{ key:'num',width:5},{key:'first_name',width:18},{key:'last_name',width:18},{key:'whatsapp',width:18},{key:'status',width:16},{key:'transport',width:30},{key:'allergies',width:28},{key:'submitted',width:22}];
 
-  // ── Header row (row 5) ──
   const headerLabels = isNotAttending
-    ? ['#', 'First Name', 'Last Name', 'WhatsApp', 'Status', 'Submitted']
-    : ['#', 'First Name', 'Last Name', 'WhatsApp', 'Status', 'Transport Home', 'Dietary / Allergies', 'Submitted'];
+    ? ['#','First Name','Last Name','WhatsApp','Status','Submitted']
+    : ['#','First Name','Last Name','WhatsApp','Status','Transport Home','Dietary / Allergies','Submitted'];
 
   const headerRow = ws.getRow(5);
   headerRow.height = 28;
@@ -264,30 +311,20 @@ app.get('/admin/export', requireAdmin, async (req, res) => {
     cell.font  = { name: 'Calibri', size: 11, bold: true, color: { argb: WHITE } };
     cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLACK } };
     cell.alignment = { horizontal: i === 0 ? 'center' : 'left', vertical: 'middle' };
-    cell.border = {
-      bottom: { style: 'medium', color: { argb: GOLD } },
-      right:  { style: 'thin',   color: { argb: '00333333' } }
-    };
+    cell.border = { bottom: { style: 'medium', color: { argb: GOLD } }, right: { style: 'thin', color: { argb: '00333333' } } };
   });
 
-  // ── Data rows (from row 6) ──
   rows.forEach((r, i) => {
-    const isEven  = i % 2 === 0;
-    const rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? WHITE : LGOLD } };
-    const rowNum  = i + 6;
-    const dataRow = ws.getRow(rowNum);
+    const rowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: i % 2 === 0 ? WHITE : LGOLD } };
+    const dataRow = ws.getRow(i + 6);
     dataRow.height = 22;
-
-    const transport = r.transport === 'yes' ? 'Yes — needs transport to drop-off'
-                    : r.transport === 'no'  ? 'No — own transport' : '—';
-    const allergies = (r.allergies && r.allergies !== 'none' && r.allergies !== '')
-                    ? r.allergies : 'None';
-    const submitted = (r.updated_at || r.created_at || '').slice(0, 16).replace('T', ' ');
+    const transport  = r.transport === 'yes' ? 'Yes — needs transport to drop-off' : r.transport === 'no' ? 'No — own transport' : '—';
+    const allergies  = (r.allergies && r.allergies !== 'none' && r.allergies !== '') ? r.allergies : 'None';
+    const submitted  = (r.updated_at || r.created_at || '').slice(0, 16).replace('T', ' ');
     const statusLabel = r.status === 'attending' ? 'Attending' : 'Not Attending';
-
     const values = isNotAttending
-      ? [i + 1, r.first_name, r.last_name, r.whatsapp || '', statusLabel, submitted]
-      : [i + 1, r.first_name, r.last_name, r.whatsapp || '', statusLabel, transport, allergies, submitted];
+      ? [i+1, r.first_name, r.last_name, r.whatsapp||'', statusLabel, submitted]
+      : [i+1, r.first_name, r.last_name, r.whatsapp||'', statusLabel, transport, allergies, submitted];
 
     values.forEach((val, ci) => {
       const cell = dataRow.getCell(ci + 1);
@@ -295,47 +332,24 @@ app.get('/admin/export', requireAdmin, async (req, res) => {
       cell.fill  = rowFill;
       cell.alignment = { horizontal: ci === 0 ? 'center' : 'left', vertical: 'middle', wrapText: true };
       cell.font  = { name: 'Calibri', size: 10, color: { argb: '00222222' } };
-      cell.border = {
-        bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } },
-        right:  { style: 'thin', color: { argb: 'FFDDDDDD' } }
-      };
-
-      // Colour-coded status cell
-      if (ci === 4) {
-        cell.font = { name: 'Calibri', size: 10, bold: true,
-          color: { argb: r.status === 'attending' ? '00276227' : '00882222' } };
-        cell.fill = { type: 'pattern', pattern: 'solid',
-          fgColor: { argb: r.status === 'attending' ? '00D4EDDA' : '00F8D7DA' } };
-      }
-      // Colour-coded transport
-      if (!isNotAttending && ci === 5 && r.transport === 'yes') {
-        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: '00155D7A' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00D1ECF1' } };
-      }
-      // Colour-coded allergies
-      if (!isNotAttending && ci === 6 && allergies !== 'None') {
-        cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: '006A3FA0' } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '00EDE0F5' } };
-      }
+      cell.border = { bottom: { style: 'thin', color: { argb: 'FFDDDDDD' } }, right: { style: 'thin', color: { argb: 'FFDDDDDD' } } };
+      if (ci === 4) { cell.font = { name:'Calibri',size:10,bold:true,color:{argb:r.status==='attending'?'00276227':'00882222'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:r.status==='attending'?'00D4EDDA':'00F8D7DA'}}; }
+      if (!isNotAttending && ci === 5 && r.transport === 'yes') { cell.font={name:'Calibri',size:10,bold:true,color:{argb:'00155D7A'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'00D1ECF1'}}; }
+      if (!isNotAttending && ci === 6 && allergies !== 'None') { cell.font={name:'Calibri',size:10,bold:true,color:{argb:'006A3FA0'}}; cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'00EDE0F5'}}; }
     });
   });
 
-  // ── Summary row at bottom ──
-  const summaryRowNum = rows.length + 6;
-  const summaryRow = ws.getRow(summaryRowNum);
-  summaryRow.height = 22;
-  const summaryCell = summaryRow.getCell(1);
-  ws.mergeCells(`A${summaryRowNum}:${isNotAttending ? 'F' : 'H'}${summaryRowNum}`);
-  summaryCell.value = `Total: ${rows.length} record${rows.length !== 1 ? 's' : ''}`;
-  summaryCell.font  = { name: 'Calibri', size: 10, bold: true, color: { argb: WHITE } };
-  summaryCell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: DKGOLD } };
-  summaryCell.alignment = { horizontal: 'right', vertical: 'middle' };
-
-  // ── Auto-filter on header row ──
   const lastCol = isNotAttending ? 'F' : 'H';
+  const summaryRowNum = rows.length + 6;
+  ws.mergeCells(`A${summaryRowNum}:${lastCol}${summaryRowNum}`);
+  const sumCell = ws.getCell(`A${summaryRowNum}`);
+  sumCell.value = `Total: ${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+  sumCell.font  = { name:'Calibri',size:10,bold:true,color:{argb:WHITE} };
+  sumCell.fill  = { type:'pattern',pattern:'solid',fgColor:{argb:DKGOLD} };
+  sumCell.alignment = { horizontal:'right',vertical:'middle' };
+  ws.getRow(summaryRowNum).height = 22;
   ws.autoFilter = `A5:${lastCol}5`;
 
-  // ── Stream to response ──
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
   await wb.xlsx.write(res);
@@ -345,7 +359,10 @@ app.get('/admin/export', requireAdmin, async (req, res) => {
 // Admin management
 app.get('/admin/admins', requireAdmin, async (req, res) => {
   const admins = await db.getAllAdmins();
-  res.render('admin-admins', { admins, currentAdmin: req.session.adminUser, success: req.query.success || null, error: req.query.error || null });
+  res.render('admin-admins', {
+    admins, currentAdmin: req.session.adminUser,
+    success: req.query.success || null, error: req.query.error || null
+  });
 });
 
 app.post('/admin/admins/add', requireAdmin, async (req, res) => {
@@ -363,7 +380,7 @@ app.post('/admin/admins/add', requireAdmin, async (req, res) => {
 });
 
 app.post('/admin/admins/delete/:id', requireAdmin, async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id  = parseInt(req.params.id);
   const all = await db.getAllAdmins();
   const target = all.find(a => a.id === id);
   if (target && target.username !== req.session.adminUser) await db.deleteAdmin(id);

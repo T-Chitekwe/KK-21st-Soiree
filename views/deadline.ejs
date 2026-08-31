@@ -1,0 +1,59 @@
+<%- include('_head') %>
+
+<div class="stars-overlay"></div>
+
+<main class="page-center">
+  <div class="card card--deadline" role="main">
+
+    <div class="deadline__icon" aria-hidden="true">◈</div>
+
+    <p class="card__eyebrow">RSVP Deadline</p>
+
+    <h1 class="card__title" style="font-size:clamp(2rem,6vw,3.2rem);">
+      K <span class="amp">&amp;</span> K
+    </h1>
+    <p class="card__subtitle">21st Soirée</p>
+
+    <div class="card__divider" aria-hidden="true">
+      <div class="card__divider-line"></div>
+      <div class="card__divider-diamond"></div>
+      <div class="card__divider-line"></div>
+    </div>
+
+    <h2 class="deadline__heading">
+      The RSVP Deadline Has Officially Closed.
+    </h2>
+
+    <p class="deadline__message">
+      We're sorry that you were not able to RSVP in time,
+      <strong><%= firstName %> <%= lastName %></strong>.
+    </p>
+
+    <p class="deadline__sub">
+      We have taken note of all those who met the deadline.
+      Access to the event reservation is only available to guests
+      on our final confirmed list.
+    </p>
+
+    <div class="deadline__divider" aria-hidden="true">
+      <div class="card__divider-line"></div>
+      <div class="card__divider-diamond"></div>
+      <div class="card__divider-line"></div>
+    </div>
+
+    <p class="deadline__closing">
+      We appreciate your understanding and hope to celebrate with you another time.
+    </p>
+
+    <p class="deadline__sign">— Katlego &amp; Karabo</p>
+
+    <a href="/" class="btn btn--ghost" style="margin-top:2rem;font-size:0.6rem;">← Go Back</a>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <p>Katlego &amp; Karabo · The Grand 21st Soirée</p>
+</footer>
+</body>
+</html>
